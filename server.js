@@ -126,10 +126,10 @@ app.get("/api/users", (req, res, next) => {
       });
 });
 
-//get a single user with username
-app.get("/api/user/:username", middleware.verify, (req, res, next) => {
+//get a single user with jwt token
+app.get("/api/user/", middleware.verify, (req, res, next) => {
     var sql = "select * from user where username = ?"
-    var params = [req.params.username]
+    var params = [req.user.username]
     db.get(sql, params, (err, row) => {
         if (err) {
           res.status(400).json({"error":err.message});
@@ -171,11 +171,11 @@ app.patch("/api/user/:username", (req, res, next) => {
     )
 })
 
-//delete a user
-app.delete("/api/user/:username", (req, res, next) => {
+//delete the user with jwt token
+app.delete("/api/user/", middleware.verify, (req, res, next) => {
     db.run(
         'DELETE FROM user WHERE username = ?',
-        req.params.username,
+        req.user.username,
         function (err, result) {
             if (err){
                 res.status(400).json({"error": res.message})
@@ -215,6 +215,22 @@ app.get("/api/listing/:id", (req, res, next) => {
         res.json({
             "message":"success",
             "data":row
+        })
+      });
+});
+
+//get all listing by current user
+app.get("/api/my_listing/", middleware.verify, (req, res, next) => {
+    var sql = "select * from listing where owner = ?"
+    var params = [req.user.username]
+    db.all(sql, params, (err, rows) => {
+        if (err) {
+          res.status(400).json({"error":err.message});
+          return;
+        }
+        res.json({
+            "message":"success",
+            "data":rows
         })
       });
 });
@@ -300,10 +316,10 @@ app.patch("/api/listing/:listing_id", (req, res, next) => {
 })
 
 //delete a listing
-app.delete("/api/listing/:listing_id", (req, res, next) => {
+app.delete("/api/listing/:listing_id", middleware.verify, (req, res, next) => {
     db.run(
-        'DELETE FROM listing WHERE listing_id = ?',
-        req.params.listing_id,
+        'DELETE FROM listing WHERE listing_id = ? and owner = ?',
+        [req.params.listing_id, req.user.username],
         function (err, result) {
             if (err){
                 res.status(400).json({"error": res.message})
@@ -314,12 +330,12 @@ app.delete("/api/listing/:listing_id", (req, res, next) => {
 })
 
 //mark a listing as sold
-app.get("/api/listing/sold/:listingid.:buyer", (req, res, next) => {
+app.get("/api/listing/sold/:listingid", (req, res, next) => {
     db.run(`UPDATE user set
         sold = 1,
         buyer = ?
         WHERE listing_id=?`,
-        [req.params.buyer, req,params.listingid],
+        [req.user.username, req,params.listingid],
         function (err, result) {
             if (err){
                 res.status(400).json({"error": this.message})
